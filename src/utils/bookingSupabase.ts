@@ -340,7 +340,8 @@ export const updateBookingStatus = async (bookingId: string, status: string): Pr
     
     // Prevent updating to the same status
     if (currentData.status === status) {
-      throw new Error(`Status sudah ${status}. Tidak dapat mengubah ke status yang sama.`);
+      console.log('Status is already the same, skipping update');
+      return;
     }
     
     // Check if this status already exists in timeline to prevent duplicates
@@ -353,7 +354,21 @@ export const updateBookingStatus = async (bookingId: string, status: string): Pr
     if (timelineCheckError) {
       console.error('Error checking timeline:', timelineCheckError);
     } else if (existingTimeline && existingTimeline.length > 0) {
-      throw new Error(`Status ${status} sudah pernah digunakan sebelumnya. Tidak dapat menggunakan status yang sama dua kali.`);
+      console.log('Status already exists in timeline, updating existing entry');
+      
+      // Update existing timeline entry instead of creating new one
+      const { error: updateTimelineError } = await supabase
+        .from('booking_timeline')
+        .update({
+          completed: true,
+          completed_at: new Date().toISOString()
+        })
+        .eq('booking_id', bookingId)
+        .eq('status', status);
+      
+      if (updateTimelineError) {
+        console.error('Error updating timeline entry:', updateTimelineError);
+      }
     }
     
     const { data, error } = await supabase
@@ -382,20 +397,40 @@ export const updateBookingStatus = async (bookingId: string, status: string): Pr
       console.log('Verified updated booking status:', verifyData);
     }
 
-    // Add timeline entry for status change
-    const { error: timelineError } = await supabase
-      .from('booking_timeline')
-      .insert({
-        booking_id: bookingId,
-        status,
-        title: `Status diubah ke ${status}`,
-        description: `Pemesanan diubah statusnya menjadi ${status}`,
-        completed: true,
-        completed_at: new Date().toISOString()
-      });
+    // Add timeline entry for status change only if it doesn't exist
+    if (!existingTimeline || existingTimeline.length === 0) {
+      const statusTitles = {
+        'pending': 'Booking Diterima',
+        'confirmed': 'Booking Dikonfirmasi',
+        'in-progress': 'Teknisi Dalam Perjalanan',
+        'servicing': 'Sedang Diperbaiki',
+        'completed': 'Service Selesai',
+        'cancelled': 'Booking Dibatalkan'
+      };
+      
+      const statusDescriptions = {
+        'pending': 'Booking Anda telah diterima dan sedang diproses',
+        'confirmed': 'Teknisi telah ditugaskan dan akan datang sesuai jadwal',
+        'in-progress': 'Teknisi sedang dalam perjalanan ke lokasi Anda',
+        'servicing': 'Printer sedang dalam proses perbaikan',
+        'completed': 'Printer telah berhasil diperbaiki dan berfungsi normal',
+        'cancelled': 'Booking telah dibatalkan'
+      };
+      
+      const { error: timelineError } = await supabase
+        .from('booking_timeline')
+        .insert({
+          booking_id: bookingId,
+          status,
+          title: statusTitles[status as keyof typeof statusTitles] || `Status diubah ke ${status}`,
+          description: statusDescriptions[status as keyof typeof statusDescriptions] || `Pemesanan diubah statusnya menjadi ${status}`,
+          completed: true,
+          completed_at: new Date().toISOString()
+        });
 
-    if (timelineError) {
-      console.error('Error adding timeline entry:', timelineError);
+      if (timelineError) {
+        console.error('Error adding timeline entry:', timelineError);
+      }
     }
   } catch (error) {
     console.error('Error updating booking status:', error);

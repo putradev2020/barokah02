@@ -524,6 +524,7 @@ export const deleteAllTechnicians = async () => {
     throw error;
   }
 };
+
 // Fetch technicians
 export const fetchTechnicians = async () => {
   try {
@@ -545,62 +546,5 @@ export const fetchTechnicians = async () => {
   } catch (error) {
     console.error('supabaseData: Error fetching technicians:', error);
     return [];
-  }
-};
-
-// Admin functions
-export const updateBookingStatus = async (bookingId: string, status: string) => {
-  try {
-    const { error } = await supabase
-      .from('service_bookings')
-      .update({ status })
-      .eq('id', bookingId);
-
-    if (error) throw error;
-
-    // Update timeline
-    await supabase
-      .from('booking_timeline')
-      .update({ 
-        completed: true, 
-        completed_at: new Date().toISOString() 
-      })
-      .eq('booking_id', bookingId)
-      .eq('status', status);
-
-    return true;
-  } catch (error) {
-    console.error('Error updating booking status:', error);
-    return false;
-  }
-};
-
-export const assignTechnician = async (bookingId: string, technicianId: string) => {
-  try {
-    const { error } = await supabase
-      .from('service_bookings')
-      .update({ technician_id: technicianId })
-      .eq('id', bookingId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error assigning technician:', error);
-    return false;
-  }
-};
-
-export const updateActualCost = async (bookingId: string, actualCost: string) => {
-  try {
-    const { error } = await supabase
-      .from('service_bookings')
-      .update({ actual_cost: actualCost })
-      .eq('id', bookingId);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error updating actual cost:', error);
-    return false;
   }
 };
